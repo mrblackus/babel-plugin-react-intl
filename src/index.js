@@ -25,6 +25,7 @@ const EXTRACTED_TAG = Symbol('ReactIntlExtracted');
 
 const COMPONENT_NAME = 'T';
 const MESSAGE_PROPERTY = 's';
+const COMMENT_PROPERTY = 'c';
 
 export default function ({types: t}) {
     function getModuleSourceName(opts) {
@@ -96,6 +97,9 @@ export default function ({types: t}) {
                     hash.id = valuePath;
                     hash.defaultMessage = valuePath;
                 }
+                else if (key === COMMENT_PROPERTY) {
+                    hash[COMMENT_PROPERTY] = valuePath;
+                }
             }
             else {
                 if (DESCRIPTOR_PROPS.has(key)) {
@@ -121,7 +125,7 @@ export default function ({types: t}) {
         return descriptor;
     }
 
-    function storeMessage({id, description, defaultMessage}, path, state) {
+    function storeMessage({id, description, defaultMessage, c}, path, state) {
         const {file, opts, reactIntl} = state;
 
         if (!(id && defaultMessage)) {
@@ -155,6 +159,10 @@ export default function ({types: t}) {
                 file: p.relative(process.cwd(), file.opts.filename),
                 ...path.node.loc,
             };
+        }
+
+        if (c) {
+            id += '##' + c;
         }
 
         reactIntl.messages.set(id, {id, description, defaultMessage, ...loc});
