@@ -9,9 +9,10 @@ import {writeFileSync} from 'fs';
 import {sync as mkdirpSync} from 'mkdirp';
 import printICUMessage from './print-icu-message';
 
+//Disable react-intl components to avoid conflict with T component
 const COMPONENT_NAMES = [
-    'FormattedMessage',
-    'FormattedHTMLMessage',
+    // 'FormattedMessage',
+    // 'FormattedHTMLMessage',
 ];
 
 const FUNCTION_NAMES = [
@@ -21,6 +22,9 @@ const FUNCTION_NAMES = [
 const DESCRIPTOR_PROPS = new Set(['id', 'description', 'defaultMessage']);
 
 const EXTRACTED_TAG = Symbol('ReactIntlExtracted');
+
+const COMPONENT_NAME = 'T';
+const MESSAGE_PROPERTY = 's';
 
 export default function ({types: t}) {
     function getModuleSourceName(opts) {
@@ -82,12 +86,21 @@ export default function ({types: t}) {
         }
     }
 
-    function createMessageDescriptor(propPaths) {
+    function createMessageDescriptor(propPaths, isTComp = false) {
         return propPaths.reduce((hash, [keyPath, valuePath]) => {
             let key = getMessageDescriptorKey(keyPath);
 
-            if (DESCRIPTOR_PROPS.has(key)) {
-                hash[key] = valuePath;
+            //If it's a T component, take its s property for id and defaultMessage
+            if (isTComp) {
+                if (key === MESSAGE_PROPERTY) {
+                    hash.id = valuePath;
+                    hash.defaultMessage = valuePath;
+                }
+            }
+            else {
+                if (DESCRIPTOR_PROPS.has(key)) {
+                    hash[key] = valuePath;
+                }
             }
 
             return hash;
@@ -202,11 +215,16 @@ export default function ({types: t}) {
             },
 
             JSXOpeningElement(path, state) {
+
+                //Detect our own T component instead of react-intl's ones
+                const isTComp = path.node.name.name === COMPONENT_NAME;
+
                 if (wasExtracted(path)) {
                     return;
                 }
 
                 const {file, opts} = state;
+
                 const moduleSourceName = getModuleSourceName(opts);
                 const name = path.get('name');
 
@@ -220,7 +238,8 @@ export default function ({types: t}) {
                     return;
                 }
 
-                if (referencesImport(name, moduleSourceName, COMPONENT_NAMES)) {
+                if (referencesImport(name, moduleSourceName, COMPONENT_NAMES) || isTComp) {
+
                     let attributes = path.get('attributes')
                         .filter((attr) => attr.isJSXAttribute());
 
@@ -228,7 +247,7 @@ export default function ({types: t}) {
                         attributes.map((attr) => [
                             attr.get('name'),
                             attr.get('value'),
-                        ])
+                        ]), isTComp
                     );
 
                     // In order for a default message to be extracted when
