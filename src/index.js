@@ -290,65 +290,23 @@ export default function ({types: t}) {
             },
 
             CallExpression(path, state) {
-                const moduleSourceName = getModuleSourceName(state.opts);
                 const callee = path.get('callee');
 
-                function assertObjectExpression(node) {
-                    if (!(node && node.isObjectExpression())) {
-                        throw path.buildCodeFrameError(
-                            `[React Intl] \`${callee.node.name}()\` must be ` +
-                            'called with an object expression with values ' +
-                            'that are React Intl Message Descriptors, also ' +
-                            'defined as object expressions.'
-                        );
-                    }
+                if (callee.node.name === 't') {
+
+                    const [textPath, _, cPath] = path.get('arguments');
+                    const text = getICUMessageValue(textPath);
+                    const c = cPath ? getMessageDescriptorValue(cPath) : undefined;
+
+
+                    storeMessage({
+                        id: text,
+                        defaultMessage: text,
+                        c,
+                    }, path, state);
+                    tagAsExtracted(path);
                 }
 
-                function processMessageObject(messageObj) {
-                    assertObjectExpression(messageObj);
-
-                    if (wasExtracted(messageObj)) {
-                        return;
-                    }
-
-                    let properties = messageObj.get('properties');
-
-                    let descriptor = createMessageDescriptor(
-                        properties.map((prop) => [
-                            prop.get('key'),
-                            prop.get('value'),
-                        ])
-                    );
-
-                    // Evaluate the Message Descriptor values, then store it.
-                    descriptor = evaluateMessageDescriptor(descriptor);
-                    storeMessage(descriptor, messageObj, state);
-
-                    // Remove description since it's not used at runtime.
-                    messageObj.replaceWith(t.objectExpression([
-                        t.objectProperty(
-                            t.stringLiteral('id'),
-                            t.stringLiteral(descriptor.id)
-                        ),
-                        t.objectProperty(
-                            t.stringLiteral('defaultMessage'),
-                            t.stringLiteral(descriptor.defaultMessage)
-                        ),
-                    ]));
-
-                    // Tag the AST node so we don't try to extract it twice.
-                    tagAsExtracted(messageObj);
-                }
-
-                if (referencesImport(callee, moduleSourceName, FUNCTION_NAMES)) {
-                    let messagesObj = path.get('arguments')[0];
-
-                    assertObjectExpression(messagesObj);
-
-                    messagesObj.get('properties')
-                        .map((prop) => prop.get('value'))
-                        .forEach(processMessageObject);
-                }
             },
         },
     };
