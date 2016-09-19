@@ -290,6 +290,11 @@ export default function ({types: t}) {
             },
 
             CallExpression(path, state) {
+
+                if (wasExtracted(path)) {
+                    return;
+                }
+
                 const callee = path.get('callee');
 
                 if (callee.node.name === 't') {
